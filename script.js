@@ -1,4 +1,6 @@
-// script.js (CORRIGIDO: O spawn da peça foi ajustado para y:0)
+// ==================== PuzzGame - script.js ====================
+// Versão com Temporizador Corrigido e Game Over completo
+// ===============================================================
 
 const COLS = 12;
 const ROWS = 24;
@@ -25,6 +27,8 @@ const nctx = nextCanvas ? nextCanvas.getContext("2d") : null;
 
 const elScore  = document.getElementById("score");
 const elLinhas = document.getElementById("linhas");
+const elTempo = document.getElementById("tempo");
+const elFinalTime = document.getElementById("final-time");
 
 let isGameOver = false;
 
@@ -41,16 +45,46 @@ let paused = false;
 let running = false;
 let timer = null;
 
-// helpers
+// Cronômetro
+let tempoInicio = null;
+let tempoInterval = null;
+
+// ==================== Helpers ====================
+
 function makeBoard(rows, cols){
   return Array.from({length: rows}, () => Array(cols).fill(0));
 }
 function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
 function clone(m){ return m.map(r => r.slice()); }
 
-// =================================================================
-// CORREÇÃO ESTÁ AQUI
-// =================================================================
+// ==================== Temporizador ====================
+
+function formatarTempo(segundos) {
+  const m = Math.floor(segundos / 60);
+  const s = segundos % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+function iniciarTemporizador() {
+  tempoInicio = Date.now(); 
+  if (tempoInterval) clearInterval(tempoInterval);
+
+  tempoInterval = setInterval(() => {
+    if (!running || paused || isGameOver) return;
+    const segundos = Math.floor((Date.now() - tempoInicio) / 1000);
+    if (elTempo) elTempo.textContent = formatarTempo(segundos);
+  }, 1000);
+}
+
+function pararTemporizador() {
+  if (tempoInterval) {
+    clearInterval(tempoInterval);
+    tempoInterval = null;
+  }
+}
+
+// ==================== Jogo ====================
+
 function spawnPiece(){
   const shape = clone(rand(SHAPES));
   const color = rand(PALETTE);
@@ -58,10 +92,9 @@ function spawnPiece(){
     shape,
     color,
     x: Math.floor((COLS - shape[0].length) / 2),
-    y: 0 // A peça DEVE nascer em y:0 para o "collide(0,0)" funcionar
+    y: 0 
   };
 }
-// =================================================================
 
 function resetGameState(){
   board = makeBoard(ROWS, COLS);
@@ -77,6 +110,12 @@ function resetGameState(){
   updateHUD();
   drawNext();
   render();
+
+  // Reinicia o cronômetro
+  pararTemporizador();
+  if (elTempo) elTempo.textContent = "00:00";
+  tempoInicio = Date.now();
+  iniciarTemporizador();
 }
 
 function drawCell(x, y, color){
@@ -225,6 +264,11 @@ function gameOver() {
   paused = true;
   isGameOver = true;
 
+  pararTemporizador();
+
+  const tempoFinalSeg = Math.floor((Date.now() - tempoInicio) / 1000);
+  if (elFinalTime) elFinalTime.textContent = formatarTempo(tempoFinalSeg);
+
   if (timer) {
     clearInterval(timer);
     timer = null;
@@ -233,7 +277,7 @@ function gameOver() {
   const gameOverDialog = document.getElementById("gameover");
   const finalScore = document.getElementById("final-score");
 
-  render(); // Desenha o último estado
+  render();
 
   if (gameOverDialog && finalScore) {
     finalScore.textContent = score;
@@ -243,7 +287,7 @@ function gameOver() {
       try { gameOverDialog.show(); } catch(e2){}
     }
   } else {
-    alert("Game Over! Sua pontuação: " + score);
+    alert("Game Over! Sua pontuação: " + score + "\nTempo: " + formatarTempo(tempoFinalSeg));
   }
 }
 
@@ -253,16 +297,12 @@ function tick(){
   if(!collide(current, 0, 1)){
     current.y++;
   } else {
-    // Peça aterrisou
     merge(current);
     clearLines();
 
-    // Pega a próxima peça (que já estava na "next")
     current = nextPiece;
-    // Gera uma nova "next"
     nextPiece = spawnPiece();
 
-    // AGORA SIM: Checa colisão com a nova peça no spawn (em y:0)
     if (collide(current, 0, 0)) {
       gameOver();
       return;
@@ -284,26 +324,21 @@ function restartLoop(){
   timer = setInterval(tick, dropMs);
 }
 
+// ==================== Controles ====================
+
 document.addEventListener("keydown",(e)=>{
   if(e.key.toLowerCase()==="r"){
-      // Permitir Reset a qualquer momento (mesmo pausado ou game over)
       if(timer) { clearInterval(timer); timer = null; }
       resetGameState();
       startLoop();
-      return; // Importante para não processar o resto
-  }
-
-  // Bloqueia ações se não estiver rodando ou se já foi game over
-  if(!running || isGameOver) {
       return;
   }
+
+  if(!running || isGameOver) return;
   
-  // Se pausado, só permite despausar (P)
   if(paused){
-      if(e.key.toLowerCase()==="p"){
-          paused = !paused;
-      }
-      return; // Bloqueia outros comandos se pausado
+      if(e.key.toLowerCase()==="p") paused = !paused;
+      return;
   }
 
   if(["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", " "].includes(e.key)){
@@ -315,27 +350,19 @@ document.addEventListener("keydown",(e)=>{
   }else if(e.key === "ArrowRight"){
     if(!collide(current, 1, 0)) current.x++;
   }else if(e.key === "ArrowDown"){
-    if(!collide(current, 0, 1)){
-      current.y++;
-    }
+    if(!collide(current, 0, 1)) current.y++;
   }else if(e.key === " "){
-    // hard drop
     let steps = 0;
     while(!collide(current, 0, 1)){ current.y++; steps++; }
     score += steps * 2; updateHUD();
-    
-    // Ações do Hard Drop (são as mesmas do "else" do tick)
     merge(current);
     clearLines();
-
     current = nextPiece;
     nextPiece = spawnPiece();
-
     if (collide(current, 0, 0)) {
       gameOver();
       return;
     }
-
     drawNext();
   }else if(e.key === "ArrowUp" || e.key.toLowerCase()==="e"){
     rotatePiece();
@@ -345,16 +372,14 @@ document.addEventListener("keydown",(e)=>{
   render();
 });
 
+// ==================== Inicialização ====================
+
 function init(){
   canvas.width  = COLS * SIZE;
   canvas.height = ROWS * SIZE;
 
-  if (nextCanvas && !nextCanvas.width) {
-      nextCanvas.width = 150;
-  }
-  if (nextCanvas && !nextCanvas.height) {
-      nextCanvas.height = 100;
-  }
+  if (nextCanvas && !nextCanvas.width) nextCanvas.width = 150;
+  if (nextCanvas && !nextCanvas.height) nextCanvas.height = 100;
 
   resetGameState();
 
@@ -362,7 +387,7 @@ function init(){
   if(gameOverDialog){
     const btns = gameOverDialog.getElementsByTagName("button");
     for(const b of btns){
-      if(b.textContent.toLowerCase().includes("jogar") || b.textContent.toLowerCase().includes("novamente")){
+      if(b.textContent.toLowerCase().includes("jogar")){
         b.addEventListener('click', () => {
           try { gameOverDialog.close(); } catch(e){}
           if(timer) { clearInterval(timer); timer = null; }
@@ -379,22 +404,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const close_button = document.getElementById('close');
 
   if(instructions && close_button){
-    try {
-        instructions.showModal();
-    } catch(e) {
-        try { instructions.show(); } catch(e2) {}
-    }
-
-    close_button.addEventListener('click', () => {
-      instructions.close();
-    });
-
+    try { instructions.showModal(); } catch(e) { try { instructions.show(); } catch(e2) {} }
+    close_button.addEventListener('click', () => { instructions.close(); });
     instructions.addEventListener('click', (event) => {
-      if(event.target === instructions){
-        instructions.close();
-      }
+      if(event.target === instructions){ instructions.close(); }
     });
-
     instructions.addEventListener('close', () => {
       if(document.getElementById("game")){
         init();

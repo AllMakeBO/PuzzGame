@@ -39,12 +39,15 @@ html{ /*Ajuste geral da página*/
 #instructions::backdrop {
   background-color: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(5px);
-  
 }
 
-#instructions button, #gameover button{
-  background: white;
-  color: black;
+#gameover {
+  color: #00FFAA;
+}
+
+#gameover::backdrop {
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
 }
 
 hr{

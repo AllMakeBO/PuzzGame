@@ -21,18 +21,24 @@
         <button id="close"> Close </button>
       </dialog>
       
-      <dialog id="gameover">
+      <dialog id="gameover"> 
         <h2>GAME OVER</h2>
+        <p>Tempo total: <span id="final-time">00:00</span></p>
         <p>Sua pontuação final foi: <span id="final-score">0</span></p>
         <button onclick="location.reload();">Jogar Novamente</button>
       </dialog>
-    
+
     <main>
       <hr> <!--Linha de separação do cabeçalho e parte principal do site-->
         <nav> <!--Tag de navegação criada para voltar ao início do site-->
           <a href="index.html">Voltar para o Início</a> <!--Link para redirecionamento para o início-->
         </nav> <!--Final da tag de navegação-->
       <hr> <!--Linha de separação da navegação e parte principal do site-->
+      
+      <p>Tempo: <span id="tempo">00:00</span></p>
+      
+      <button id="pause-btn" class="hud-btn">⏸ Pausar</button>
+      <div id="paused-text">PAUSADO</div>
       
       <div id="gamegeopuzz"> <!--Divisória das informações do jogo-->
         <div id="linescoregeopuzz"> <!--Divisória para contagem de pontos e linhas-->

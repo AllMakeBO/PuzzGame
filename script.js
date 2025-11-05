@@ -1,13 +1,15 @@
+// script.js (CORRIGIDO: O spawn da peça foi ajustado para y:0)
+
 const COLS = 12;
 const ROWS = 24;
-const SIZE = 25;                // tamanho do quadrado (px)
-const DROP_MS_START = 700;      // queda inicial (ms)
+const SIZE = 25;
+const DROP_MS_START = 700;
 const LINES_PER_LEVEL = 10;
-const SPEED_STEP = 70;          // aceleração por nível (ms a menos)
+const SPEED_STEP = 70;
 
 const PALETTE = ["#53e4df","#f1b84b","#f25f5c","#b97cf6","#5cc06c","#6fb5ff","#ff8ad6","#a3f77b"];
 
-const SHAPES = [ // Formato das peças
+const SHAPES = [
   [[1,1,1]],
   [[1,1],[1,1]],
   [[0,1,0],[1,1,1]],
@@ -24,25 +26,31 @@ const nctx = nextCanvas ? nextCanvas.getContext("2d") : null;
 const elScore  = document.getElementById("score");
 const elLinhas = document.getElementById("linhas");
 
+let isGameOver = false;
 
-let board = makeBoard(ROWS, COLS);
-let current = spawnPiece();
-let nextPiece = spawnPiece();
+let board;
+let current;
+let nextPiece;
 
 let score = 0;
 let lines = 0;
 let level = 1;
 let dropMs = DROP_MS_START;
+
 let paused = false;
+let running = false;
 let timer = null;
 
-// Ajustes do tamanho da tela do jogo
+// helpers
 function makeBoard(rows, cols){
   return Array.from({length: rows}, () => Array(cols).fill(0));
 }
 function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
 function clone(m){ return m.map(r => r.slice()); }
 
+// =================================================================
+// CORREÇÃO ESTÁ AQUI
+// =================================================================
 function spawnPiece(){
   const shape = clone(rand(SHAPES));
   const color = rand(PALETTE);
@@ -50,8 +58,25 @@ function spawnPiece(){
     shape,
     color,
     x: Math.floor((COLS - shape[0].length) / 2),
-    y: -shape.length
+    y: 0 // A peça DEVE nascer em y:0 para o "collide(0,0)" funcionar
   };
+}
+// =================================================================
+
+function resetGameState(){
+  board = makeBoard(ROWS, COLS);
+  current = spawnPiece();
+  nextPiece = spawnPiece();
+  score = 0;
+  lines = 0;
+  level = 1;
+  dropMs = DROP_MS_START;
+  paused = false;
+  running = true;
+  isGameOver = false;
+  updateHUD();
+  drawNext();
+  render();
 }
 
 function drawCell(x, y, color){
@@ -84,12 +109,17 @@ function drawPiece(p){
 
 function drawNext(){
   if(!nctx) return;
+  const s = 18;
   nctx.clearRect(0,0,nextCanvas.width,nextCanvas.height);
-  const s = SIZE;
+  
+  const canvasWidth = nextCanvas.width;
+  const canvasHeight = nextCanvas.height;
+
   const pw = nextPiece.shape[0].length * s;
   const ph = nextPiece.shape.length * s;
-  const offX = Math.floor((nextCanvas.width - pw)/2);
-  const offY = Math.floor((nextCanvas.height - ph)/2);
+  const offX = Math.floor((canvasWidth - pw)/2);
+  const offY = Math.floor((canvasHeight - ph)/2);
+
   for(let y=0;y<nextPiece.shape.length;y++){
     for(let x=0;x<nextPiece.shape[y].length;x++){
       if(nextPiece.shape[y][x]){
@@ -138,7 +168,6 @@ function rotateMatrix(mat){
   return out;
 }
 
-// Função para rotação de peças
 function rotatePiece(){
   const rotated = rotateMatrix(current.shape);
   const kicks = [0, -1, 1, -2, 2];
@@ -161,7 +190,6 @@ function clearLines(){
       y++;
     }
   }
-  // Contagem de pontos de acordo com as linhas subtraídas
   if(cleared){
     let add = 0;
     if(cleared === 1) add = 10;
@@ -176,7 +204,7 @@ function clearLines(){
     if(newLevel !== level){
       level = newLevel;
       dropMs = Math.max(120, DROP_MS_START - (level-1)*SPEED_STEP);
-      restartLoop(); // acelera o jogo
+      restartLoop();
     }
     updateHUD();
   }
@@ -192,60 +220,96 @@ function render(){
   drawPiece(current);
 }
 
+function gameOver() {
+  running = false;
+  paused = true;
+  isGameOver = true;
+
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+
+  const gameOverDialog = document.getElementById("gameover");
+  const finalScore = document.getElementById("final-score");
+
+  render(); // Desenha o último estado
+
+  if (gameOverDialog && finalScore) {
+    finalScore.textContent = score;
+    try {
+      if (!gameOverDialog.open) gameOverDialog.showModal();
+    } catch(e) {
+      try { gameOverDialog.show(); } catch(e2){}
+    }
+  } else {
+    alert("Game Over! Sua pontuação: " + score);
+  }
+}
+
 function tick(){
-  if(paused) return;
+  if(!running || paused || isGameOver) return;
 
   if(!collide(current, 0, 1)){
     current.y++;
   } else {
-    // fixa a peça no tabuleiro
+    // Peça aterrisou
     merge(current);
     clearLines();
 
-    // nova peça
+    // Pega a próxima peça (que já estava na "next")
     current = nextPiece;
+    // Gera uma nova "next"
     nextPiece = spawnPiece();
-    drawNext();
 
-    // se a peça já nasce colidindo: fim de jogo
-    if(collide(current, 0, 0)){
-      const gameOverDialog = document.getElementById("gameover");
-      const finalScore = document.getElementById("final-score");
-      if(gameOverDialog && finalScore){
-        finalScore.textContent = score;
-        gameOverDialog.showModal();
-      } else {
-        alert("Game Over!"); // Fallback caso o dialog não exista
-      }
-      clearInterval(timer); // Para o loop do jogo
-      // Não reseta o jogo aqui, o reset será feito pelo botão "Jogar Novamente" no dialog
-      // board = makeBoard(ROWS, COLS);
-      // score = 0;
-      // lines = 0;
-      // level = 1;
-      // dropMs = DROP_MS_START;
-      // updateHUD();
+    // AGORA SIM: Checa colisão com a nova peça no spawn (em y:0)
+    if (collide(current, 0, 0)) {
+      gameOver();
+      return;
     }
+
+    drawNext();
   }
 
   render();
 }
 
-
 function startLoop(){
+  if(!running || isGameOver) return;
   if(timer) clearInterval(timer);
   timer = setInterval(tick, dropMs);
 }
 function restartLoop(){
-  startLoop();
+  if(timer) clearInterval(timer);
+  timer = setInterval(tick, dropMs);
 }
 
-// Comandos
 document.addEventListener("keydown",(e)=>{
+  if(e.key.toLowerCase()==="r"){
+      // Permitir Reset a qualquer momento (mesmo pausado ou game over)
+      if(timer) { clearInterval(timer); timer = null; }
+      resetGameState();
+      startLoop();
+      return; // Importante para não processar o resto
+  }
+
+  // Bloqueia ações se não estiver rodando ou se já foi game over
+  if(!running || isGameOver) {
+      return;
+  }
+  
+  // Se pausado, só permite despausar (P)
+  if(paused){
+      if(e.key.toLowerCase()==="p"){
+          paused = !paused;
+      }
+      return; // Bloqueia outros comandos se pausado
+  }
+
   if(["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", " "].includes(e.key)){
     e.preventDefault();
   }
-  
+
   if(e.key === "ArrowLeft"){
     if(!collide(current, -1, 0)) current.x--;
   }else if(e.key === "ArrowRight"){
@@ -255,26 +319,28 @@ document.addEventListener("keydown",(e)=>{
       current.y++;
     }
   }else if(e.key === " "){
-    // hard drop simples
+    // hard drop
     let steps = 0;
     while(!collide(current, 0, 1)){ current.y++; steps++; }
     score += steps * 2; updateHUD();
+    
+    // Ações do Hard Drop (são as mesmas do "else" do tick)
     merge(current);
     clearLines();
+
     current = nextPiece;
     nextPiece = spawnPiece();
+
+    if (collide(current, 0, 0)) {
+      gameOver();
+      return;
+    }
+
     drawNext();
   }else if(e.key === "ArrowUp" || e.key.toLowerCase()==="e"){
     rotatePiece();
   }else if(e.key.toLowerCase()==="p"){
     paused = !paused;
-  }else if(e.key.toLowerCase()==="r"){
-    // reset rápido
-    board = makeBoard(ROWS, COLS);
-    current = spawnPiece();
-    nextPiece = spawnPiece();
-    score=0; lines=0; level=1; dropMs=DROP_MS_START; paused=false;
-    updateHUD(); drawNext(); render(); restartLoop();
   }
   render();
 });
@@ -282,40 +348,63 @@ document.addEventListener("keydown",(e)=>{
 function init(){
   canvas.width  = COLS * SIZE;
   canvas.height = ROWS * SIZE;
-  updateHUD();
-  drawNext();
-  render();
-  startLoop();
+
+  if (nextCanvas && !nextCanvas.width) {
+      nextCanvas.width = 150;
+  }
+  if (nextCanvas && !nextCanvas.height) {
+      nextCanvas.height = 100;
+  }
+
+  resetGameState();
+
+  const gameOverDialog = document.getElementById("gameover");
+  if(gameOverDialog){
+    const btns = gameOverDialog.getElementsByTagName("button");
+    for(const b of btns){
+      if(b.textContent.toLowerCase().includes("jogar") || b.textContent.toLowerCase().includes("novamente")){
+        b.addEventListener('click', () => {
+          try { gameOverDialog.close(); } catch(e){}
+          if(timer) { clearInterval(timer); timer = null; }
+          resetGameState();
+          startLoop();
+        });
+      }
+    }
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   const instructions = document.getElementById('instructions');
   const close_button = document.getElementById('close');
-  
+
   if(instructions && close_button){
-    instructions.showModal();
-    
+    try {
+        instructions.showModal();
+    } catch(e) {
+        try { instructions.show(); } catch(e2) {}
+    }
+
     close_button.addEventListener('click', () => {
       instructions.close();
     });
-    
+
     instructions.addEventListener('click', (event) => {
       if(event.target === instructions){
         instructions.close();
       }
     });
-    
-    // Inicia o jogo após o pop-up ser fechado
+
     instructions.addEventListener('close', () => {
-      // A função init() só deve ser chamada na página do jogo (puzgame.html)
       if(document.getElementById("game")){
         init();
+        startLoop();
       }
     });
   } else {
-    // Se não houver pop-up (ex: na página do jogo), inicia o jogo imediatamente
     if(document.getElementById("game")){
       init();
+      startLoop();
     }
   }
 });

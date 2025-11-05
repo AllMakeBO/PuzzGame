@@ -1,0 +1,179 @@
+html{ /*Ajuste geral da página*/
+  background: #011b21;
+  width: 100%;
+  max-width: 100%;
+}
+
+#instructions, #gameover {
+  width: 50%;
+  max-width: 300px;
+  max-height: 50vh;
+  margin: auto; /* Garante que o pop-upp dique no centro da tela */
+  border: none;
+  border-radius: 8px;
+  background: #001A26;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+  
+
+  
+  h2{
+    font-size: 30px;
+  }
+  
+  p{
+    font-size: 20px;
+  }
+  
+  img{
+    margin-bottom: 15px;
+  }
+  
+}
+
+#instructions * {
+  color: #00FFAA;
+}
+
+#instructions::backdrop {
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  
+}
+
+#instructions button, #gameover button{
+  background: white;
+  color: black;
+}
+
+hr{
+  background-color: #bfdae0;
+  height: 1px;
+}
+
+main{
+  margin-top: 30px;
+}
+
+header{
+  color: #bfdae0;
+  background: #011b21;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+.titlename{
+  margin-bottom: 5px;
+  margin-top: -50px;
+  margin-left: 70px;
+}
+
+nav{
+  text-align: center;
+}
+
+a{
+  text-decoration: none;
+  color: #bfdae0;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+button{
+  border-radius: 30px;
+  height: 66px;
+  width: 102px;
+  font-size: 17px;
+  background: #02262e;
+  color: #efe027;
+  border-color: #efe027;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+p{
+  color: #bfdae0;
+  font-size: 20px;
+}
+
+.imgandbut{
+  text-align: center;
+}
+
+.logogame{
+  width: 350px;
+  height: 350px;
+  border-radius: 25px;
+  border: double #efe027;
+  border-width: 7px;
+}
+
+.logotop{
+  width: 60px;
+  height: 60px;
+  border-radius: 100%;
+  margin-top: 10px;
+}
+
+#gamegeopuzz{ /*Ajuste da div principal do conjunto que compoe o jogo*/
+  display: flex;
+  justify-content: center;
+  margin: 20px auto;
+  max-width: 900px; /* Limite máximo para telas grandes */
+  gap: 10px; /* Espaçamento entre os elementos */
+}
+
+#canvanext{ /*Ajuste para colocar a posição correta do canva de próxima peça*/
+  /* Removido ajuste de posição, o flexbox deve centralizar */
+}
+
+#linescoregeopuzz{ /*Ajustes do mostrador de pontos e linhas */
+  color: #efe027;
+  text-align: center;
+  background: #024657;
+  border: double #efe027;
+  border-width: 7px;
+  border-radius: 20px;
+  width: 180px; /* Largura fixa para os painéis laterais */
+  height: 260px;
+  padding: 10px;
+}
+
+#backgroundgeopuzz{ /*Ajustes do mostrador do jogo */
+  color: #efe027;
+  text-align: center;
+  background: #024657;
+  border: double #efe027;
+  border-width: 7px;
+  border-radius: 20px;
+  /* As dimensões do canvas serão definidas no HTML para evitar conflito com o JS */
+}
+
+#nextgeopuzz{ /*Ajustes do mostrador da próxima peça */
+  color: #efe027;
+  text-align: center;
+  background: #024657;
+  border: double #efe027;
+  border-width: 7px;
+  border-radius: 20px;
+  width: 180px; /* Largura fixa para os painéis laterais */
+  height: 260px;
+  padding: 10px;
+}
+@media (max-width: 768px) {
+  #gamegeopuzz {
+    flex-direction: column; /* Empilha os elementos em telas menores */
+    align-items: center;
+  }
+
+  #linescoregeopuzz, #nextgeopuzz {
+    width: 90%; /* Ocupa a maior parte da largura */
+    max-width: 300px; /* Limite para não ficar muito largo */
+    height: auto; /* Altura automática */
+    margin: 10px 0;
+  }
+  
+  #backgroundgeopuzz {
+    /* As dimensões do canvas serão definidas no HTML para evitar conflito com o JS */
+  }
+}

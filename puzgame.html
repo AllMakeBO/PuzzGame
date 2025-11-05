@@ -10,13 +10,13 @@
 </head>
 <body>
     <header> <!--Início do cabeçalho da página-->
-      <img class="logotop" src="https://uploads.onecompiler.io/43s2gpp6m/43stpacxc/1000116022.png"> <!--Logo do projeto (mesma logo da página)--> 
+      <img class="logotop" src="https://uploads.onecompiler.io/43s2gpp6m/43stpacxc/1000116022.png" alt="logo"> <!--Logo do projeto (mesma logo da página)--> 
       <h1 class="titlename">Geometry Puzzle</h1> <!--Título-->
     </header> <!--Fim do cabeçalho da página-->
     
       <dialog id="instructions">
         <h2> Como jogar: </h2>
-        <img src="https://uploads.onecompiler.io/43s2gpp6m/43u6znhkn/Setas.png">
+        <img src="https://uploads.onecompiler.io/43s2gpp6m/43u6znhkn/Setas.png" alt="setas">
         <p> Use as setas do teclado para controlar as peças que cairam no bloco. </p>
         <button id="close"> Close </button>
       </dialog>
@@ -25,7 +25,17 @@
         <h2>GAME OVER</h2>
         <p>Tempo total: <span id="final-time">00:00</span></p>
         <p>Sua pontuação final foi: <span id="final-score">0</span></p>
-        <button onclick="location.reload();">Jogar Novamente</button>
+
+        <!-- Se bateu recorde, será mostrado esse bloco (JS controla a visibilidade) -->
+        <div id="new-record-block" style="display:none; margin-top:10px;">
+          <p>🎉 Novo recorde! Digite seu nome:</p>
+          <input id="new-record-name" placeholder="Seu nome" maxlength="20" />
+          <button id="save-record-btn">Salvar recorde</button>
+        </div>
+
+        <div style="margin-top:12px;">
+          <button id="replay-btn">Jogar Novamente</button>
+        </div>
       </dialog>
 
     <main>
@@ -35,19 +45,25 @@
         </nav> <!--Final da tag de navegação-->
       <hr> <!--Linha de separação da navegação e parte principal do site-->
       
-      <p>Tempo: <span id="tempo">00:00</span></p>
-      
-      <button id="pause-btn" class="hud-btn">⏸ Pausar</button>
-      <div id="paused-text">PAUSADO</div>
-      
+      <div style="display:flex; justify-content:space-between; align-items:center; max-width:900px; margin: 0 auto 10px;">
+        <p>Tempo: <span id="tempo">00:00</span></p>
+        <div>
+          <button id="pause-btn" class="hud-btn">⏸ Pausar</button>
+        </div>
+      </div>
+
       <div id="gamegeopuzz"> <!--Divisória das informações do jogo-->
         <div id="linescoregeopuzz"> <!--Divisória para contagem de pontos e linhas-->
-        <h1>Pontos:</h1>
-        <p id="score"></p> <!--Mostra a quantidade de pontos marcados-->
-        <br>
-        
-        <h1>Linhas:</h1>
-        <p id="linhas"></p> <!--Mostra a quantidade de linhas subtraídas-->
+          <h1>Pontos:</h1>
+          <p id="score">0</p> <!--Mostra a quantidade de pontos marcados-->
+          <br>
+          
+          <h1>Linhas:</h1>
+          <p id="linhas">0</p> <!--Mostra a quantidade de linhas subtraídas-->
+          <br>
+
+          <h1>Recorde:</h1>
+          <p id="record-display">- (<span id="record-name">-</span>)</p>
         </div>
       
         <div id="backgroundgeopuzz"> <!--Divisória do jogo-->
@@ -61,9 +77,28 @@
         </div>
       </div>
       
-      <button onclick="location.reload();">Reiniciar</button> <!--Botão para reiniciar a página-->
+      <div style="text-align:center; margin-top:10px;">
+        <button onclick="location.reload();">Reiniciar</button> <!--Botão para reiniciar a página-->
+      </div>
     </main>
-    
+
+    <!-- Tela de pause (overlay) -->
+    <div id="pause-overlay" class="pause-overlay" style="display:none;">
+      <div class="pause-card">
+        <h2>Jogo Pausado ⏸</h2>
+        <p>Desenvolvido por:</p>
+        <p style="margin:10px 0;">
+          <a href="https://github.com/0001137700-star" target="_blank" rel="noopener noreferrer">Ana Julia</a> <br>
+          <a href="https://github.com/CristianoGuimaraesCorrea" target="_blank" rel="noopener noreferrer">Cristiano Guimarães</a> <br>
+          <a href="https://github.com/jpvieirag20-hub" target="_blank" rel="noopener noreferrer">João Pedro</a> <br>
+          <a href="https://github.com/" target="_blank" rel="noopener noreferrer">Maria Eduarda</a> <br>
+          <a href="https://github.com/AllMakeBO" target="_blank" rel="noopener noreferrer">Moisés Borba</a><br>
+          <a href="https://github.com/0001141332-collab" target="_blank" rel="noopener noreferrer">Nicolas de Morais</a>
+        </p>
+        <button id="resume-btn">▶ Continuar</button>
+      </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>

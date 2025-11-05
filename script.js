@@ -1,5 +1,5 @@
 // ==================== PuzzGame - script.js ====================
-// Versão com Temporizador Corrigido e Game Over completo
+// Versão adaptada com: temporizador, pause overlay, recorde com nome salvo no localStorage
 // ===============================================================
 
 const COLS = 12;
@@ -30,6 +30,22 @@ const elLinhas = document.getElementById("linhas");
 const elTempo = document.getElementById("tempo");
 const elFinalTime = document.getElementById("final-time");
 
+const pauseBtn = document.getElementById("pause-btn");
+const resumeBtn = document.getElementById("resume-btn");
+const pauseOverlay = document.getElementById("pause-overlay");
+const pausedText = document.getElementById("paused-text");
+
+const recordDisplay = document.getElementById("record-display");
+const recordNameSpan = document.getElementById("record-name");
+
+// gameover dialog elements
+const gameoverDialog = document.getElementById("gameover");
+const finalScoreEl = document.getElementById("final-score");
+const newRecordBlock = document.getElementById("new-record-block");
+const newRecordNameInput = document.getElementById("new-record-name");
+const saveRecordBtn = document.getElementById("save-record-btn");
+const replayBtn = document.getElementById("replay-btn");
+
 let isGameOver = false;
 
 let board;
@@ -49,6 +65,20 @@ let timer = null;
 let tempoInicio = null;
 let tempoInterval = null;
 
+// LocalStorage keys
+const LS_KEY_SCORE = "gp_highscore";
+const LS_KEY_NAME  = "gp_recordname";
+const LS_KEY_PLAYER = "gp_playername";
+
+// load record
+let highScore = parseInt(localStorage.getItem(LS_KEY_SCORE)) || 0;
+let recordName = localStorage.getItem(LS_KEY_NAME) || "-";
+recordNameSpan.textContent = recordName;
+if(recordDisplay) recordDisplay.textContent = `${highScore} (${recordName})`;
+
+// player name (if not set, will prompt on first start)
+let playerName = localStorage.getItem(LS_KEY_PLAYER) || null;
+
 // ==================== Helpers ====================
 
 function makeBoard(rows, cols){
@@ -66,7 +96,7 @@ function formatarTempo(segundos) {
 }
 
 function iniciarTemporizador() {
-  tempoInicio = Date.now(); 
+  if (!tempoInicio) tempoInicio = Date.now();
   if (tempoInterval) clearInterval(tempoInterval);
 
   tempoInterval = setInterval(() => {
@@ -97,6 +127,13 @@ function spawnPiece(){
 }
 
 function resetGameState(){
+  // ask player name first time
+  if (!playerName) {
+    const n = prompt("Digite seu nome (será usado para recorde):", "Jogador");
+    playerName = (n && n.trim()) ? n.trim() : "Jogador";
+    localStorage.setItem(LS_KEY_PLAYER, playerName);
+  }
+
   board = makeBoard(ROWS, COLS);
   current = spawnPiece();
   nextPiece = spawnPiece();
@@ -116,6 +153,10 @@ function resetGameState(){
   if (elTempo) elTempo.textContent = "00:00";
   tempoInicio = Date.now();
   iniciarTemporizador();
+
+  // ensure timers
+  if (timer) { clearInterval(timer); timer = null; }
+  startLoop();
 }
 
 function drawCell(x, y, color){
@@ -252,7 +293,10 @@ function clearLines(){
 function updateHUD(){
   if(elScore)  elScore.textContent  = score;
   if(elLinhas) elLinhas.textContent = lines;
+  if(recordDisplay) recordDisplay.textContent = `${highScore} (${recordName})`;
 }
+
+// ==================== Render & GameOver ====================
 
 function render(){
   drawBoard();
@@ -274,22 +318,24 @@ function gameOver() {
     timer = null;
   }
 
-  const gameOverDialog = document.getElementById("gameover");
-  const finalScore = document.getElementById("final-score");
+  finalScoreEl.textContent = score;
 
-  render();
-
-  if (gameOverDialog && finalScore) {
-    finalScore.textContent = score;
-    try {
-      if (!gameOverDialog.open) gameOverDialog.showModal();
-    } catch(e) {
-      try { gameOverDialog.show(); } catch(e2){}
-    }
+  // Se novo record, mostra bloco para salvar nome
+  if (score > highScore) {
+    newRecordBlock.style.display = "block";
+    newRecordNameInput.value = playerName || "";
   } else {
-    alert("Game Over! Sua pontuação: " + score + "\nTempo: " + formatarTempo(tempoFinalSeg));
+    newRecordBlock.style.display = "none";
+  }
+
+  try {
+    if (!gameoverDialog.open) gameoverDialog.showModal();
+  } catch(e) {
+    try { gameoverDialog.show(); } catch(e2){}
   }
 }
+
+// ==================== Loop, start/restart ====================
 
 function tick(){
   if(!running || paused || isGameOver) return;
@@ -324,22 +370,53 @@ function restartLoop(){
   timer = setInterval(tick, dropMs);
 }
 
+// ==================== Pause control ====================
+
+function togglePause(){
+  if (!running || isGameOver) return;
+
+  paused = !paused;
+
+  if (paused) {
+    // pause: stop fall loop and tempo
+    if (timer) { clearInterval(timer); timer = null; }
+    pararTemporizador();
+    if (pauseOverlay) pauseOverlay.style.display = "flex";
+    if (pausedText) pausedText.style.display = "block";
+    if (pauseBtn) pauseBtn.textContent = "▶ Continuar";
+  } else {
+    // resume: restart timers; preserve elapsed time
+    // tempoInicio ajusta para continuar do ponto certo
+    const elapsed = parseTempo(elTempo.textContent) * 1000;
+    tempoInicio = Date.now() - elapsed;
+    iniciarTemporizador();
+    startLoop();
+    if (pauseOverlay) pauseOverlay.style.display = "none";
+    if (pausedText) pausedText.style.display = "none";
+    if (pauseBtn) pauseBtn.textContent = "⏸ Pausar";
+  }
+}
+
+function parseTempo(texto) {
+  const parts = (texto || "00:00").split(':').map(n => parseInt(n,10) || 0);
+  return parts[0]*60 + parts[1];
+}
+
 // ==================== Controles ====================
 
 document.addEventListener("keydown",(e)=>{
   if(e.key.toLowerCase()==="r"){
       if(timer) { clearInterval(timer); timer = null; }
       resetGameState();
-      startLoop();
       return;
   }
 
-  if(!running || isGameOver) return;
-  
-  if(paused){
-      if(e.key.toLowerCase()==="p") paused = !paused;
-      return;
+  if(e.key.toLowerCase()==="p"){
+    togglePause();
+    return;
   }
+
+  if(!running || isGameOver || paused) return;
 
   if(["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", " "].includes(e.key)){
     e.preventDefault();
@@ -366,11 +443,37 @@ document.addEventListener("keydown",(e)=>{
     drawNext();
   }else if(e.key === "ArrowUp" || e.key.toLowerCase()==="e"){
     rotatePiece();
-  }else if(e.key.toLowerCase()==="p"){
-    paused = !paused;
   }
   render();
 });
+
+// Pause / resume buttons
+if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
+if (resumeBtn) resumeBtn.addEventListener('click', togglePause);
+
+// Save new record button
+if (saveRecordBtn) {
+  saveRecordBtn.addEventListener('click', () => {
+    const name = (newRecordNameInput.value || playerName || "Jogador").trim();
+    highScore = score;
+    recordName = name || "Jogador";
+    localStorage.setItem(LS_KEY_SCORE, String(highScore));
+    localStorage.setItem(LS_KEY_NAME, recordName);
+    recordNameSpan.textContent = recordName;
+    if(recordDisplay) recordDisplay.textContent = `${highScore} (${recordName})`;
+    newRecordBlock.style.display = "none";
+    // fecha dialog e reinicia
+    try { gameoverDialog.close(); } catch(e){}
+  });
+}
+
+// replay button
+if (replayBtn) {
+  replayBtn.addEventListener('click', () => {
+    try { gameoverDialog.close(); } catch(e){}
+    resetGameState();
+  });
+}
 
 // ==================== Inicialização ====================
 
@@ -383,23 +486,7 @@ function init(){
 
   resetGameState();
 
-  const gameOverDialog = document.getElementById("gameover");
-  if(gameOverDialog){
-    const btns = gameOverDialog.getElementsByTagName("button");
-    for(const b of btns){
-      if(b.textContent.toLowerCase().includes("jogar")){
-        b.addEventListener('click', () => {
-          try { gameOverDialog.close(); } catch(e){}
-          if(timer) { clearInterval(timer); timer = null; }
-          resetGameState();
-          startLoop();
-        });
-      }
-    }
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
+  // instructions handling (preserve your original logic)
   const instructions = document.getElementById('instructions');
   const close_button = document.getElementById('close');
 
@@ -411,14 +498,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     instructions.addEventListener('close', () => {
       if(document.getElementById("game")){
-        init();
-        startLoop();
+        // startLoop already called in resetGameState
       }
     });
-  } else {
-    if(document.getElementById("game")){
-      init();
-      startLoop();
-    }
   }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  init();
 });

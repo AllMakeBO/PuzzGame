@@ -31,6 +31,13 @@ html{ /*Ajuste geral da página*/
   }
   
 }
+#paused-text{
+  display:none;
+  color:#fff;
+  font-size:24px;
+  text-align:center;
+  margin-top:10px;
+}
 
 #instructions * {
   color: #00FFAA;

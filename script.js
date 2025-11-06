@@ -138,21 +138,26 @@ function unlockAudio() {
   if (musicStarted) return; // Já desbloqueado
   console.log("Tentando desbloquear áudio...");
 
-  // Toca todos os áudios e pausa (técnica para "acordar" o áudio no celular/browser)
-  allAudio.forEach(audio => {
-      audio.play().catch(e => console.warn("Erro ao 'acordar' áudio:", e.message));
-      audio.pause();
-      audio.currentTime = 0;
-  });
-  
-  // Agora tenta tocar a música de fundo
-  playMusic();
+	  // Toca todos os áudios e pausa (técnica para "acordar" o áudio no celular/browser)
+	  // O .play() deve ser chamado em todos os elementos de áudio para desbloqueá-los.
+	  allAudio.forEach(audio => {
+	      const playPromise = audio.play();
+	      if (playPromise !== undefined) {
+	          playPromise.then(_ => {
+	              audio.pause();
+	              audio.currentTime = 0;
+	          }).catch(e => console.warn("Erro ao 'acordar' áudio:", e.message));
+	      }
+	  });
+	  
+	  // Agora tenta tocar a música de fundo
+	  playMusic();
 }
 
 function playMusic() {
   if (musicStarted && !bgMusic.paused) return; // Já tocando
   
-  if (bgMusic && bgMusic.paused && !paused && running && !isGameOver) {
+	  if (bgMusic && bgMusic.paused && !paused && running && !isGameOver) {
      applyAudioSettings();
      let promise = bgMusic.play();
      if (promise !== undefined) {

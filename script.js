@@ -1,6 +1,5 @@
 // ==================== PuzzGame - script.js ====================
-// Versão completa com: Áudio, Configurações, Pause, Recordes.
-// CORREÇÃO DE ÁUDIO: Inicia áudio no clique do pop-up.
+// Código do puzgame.html integrado ao layout do Geometry Puzzle
 // ===============================================================
 
 const COLS = 12;
@@ -13,12 +12,13 @@ const SPEED_STEP = 70;
 const PALETTE = ["#53e4df","#f1b84b","#f25f5c","#b97cf6","#5cc06c","#6fb5ff","#ff8ad6","#a3f77b"];
 
 const SHAPES = [
-  [[1,1,1]],
-  [[1,1],[1,1]],
-  [[0,1,0],[1,1,1]],
-  [[1,0],[1,0],[1,1]],
-  [[1,1,0],[0,1,1]],
-  [[0,1,1],[1,1,0]],
+    [[1,1,1,1]], // I
+    [[1,1],[1,1]], // O
+    [[0,1,0],[1,1,1]], // T
+    [[1,0,0],[1,1,1]], // L
+    [[0,0,1],[1,1,1]], // J
+    [[1,1,0],[0,1,1]], // S
+    [[0,1,1],[1,1,0]], // Z
 ];
 
 const canvas = document.getElementById("game");
@@ -26,7 +26,7 @@ const ctx = canvas.getContext("2d");
 const nextCanvas = document.getElementById("canvanext") || null;
 const nctx = nextCanvas ? nextCanvas.getContext("2d") : null;
 
-const elScore  = document.getElementById("score");
+const elScore = document.getElementById("score");
 const elLinhas = document.getElementById("linhas");
 const elTempo = document.getElementById("tempo");
 const elFinalTime = document.getElementById("final-time");
@@ -34,7 +34,6 @@ const elFinalTime = document.getElementById("final-time");
 const pauseBtn = document.getElementById("pause-btn");
 const resumeBtn = document.getElementById("resume-btn");
 const pauseOverlay = document.getElementById("pause-overlay");
-const pausedText = document.getElementById("paused-text");
 
 const recordDisplay = document.getElementById("record-display");
 const recordNameSpan = document.getElementById("record-name");
@@ -83,10 +82,10 @@ let tempoInterval = null;
 
 // LocalStorage keys
 const LS_KEY_SCORE = "gp_highscore";
-const LS_KEY_NAME  = "gp_recordname";
+const LS_KEY_NAME = "gp_recordname";
 const LS_KEY_PLAYER = "gp_playername";
 const LS_KEY_VOLUME = "gp_volume";
-const LS_KEY_MUTED = "gp_muted"; 
+const LS_KEY_MUTED = "gp_muted";
 
 // load record
 let highScore = parseInt(localStorage.getItem(LS_KEY_SCORE)) || 0;
@@ -100,506 +99,500 @@ let playerName = localStorage.getItem(LS_KEY_PLAYER) || null;
 // --- ESTADOS DE ÁUDIO ---
 let currentVolume = parseFloat(localStorage.getItem(LS_KEY_VOLUME)) || 0.5;
 let isMuted = (localStorage.getItem(LS_KEY_MUTED) === 'true') || false;
-let musicStarted = false; // Flag para controlar o autoplay
+let musicStarted = false;
 // --- FIM ESTADOS ---
-
 
 // ==================== Helpers ====================
 
 function makeBoard(rows, cols){
-  return Array.from({length: rows}, () => Array(cols).fill(0));
+    return Array.from({length: rows}, () => Array(cols).fill(0));
 }
-function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
-function clone(m){ return m.map(r => r.slice()); }
+
+function rand(arr){ 
+    return arr[Math.floor(Math.random() * arr.length)]; 
+}
+
+function clone(m){ 
+    return m.map(r => r.slice()); 
+}
 
 // ==================== Áudio & Configurações ====================
 
 function applyAudioSettings() {
-  const effectiveVolume = isMuted ? 0 : currentVolume;
-  allAudio.forEach(audio => {
-    if (audio) {
-      audio.volume = effectiveVolume;
-      audio.muted = isMuted;
-    }
-  });
-  
-  if (volumeSlider) volumeSlider.value = currentVolume;
-  if (volumeValueSpan) volumeValueSpan.textContent = `${Math.round(currentVolume * 100)}%`;
-  if (muteCheckbox) muteCheckbox.checked = isMuted;
+    const effectiveVolume = isMuted ? 0 : currentVolume;
+    allAudio.forEach(audio => {
+        if (audio) {
+            audio.volume = effectiveVolume;
+            audio.muted = isMuted;
+        }
+    });
+    
+    if (volumeSlider) volumeSlider.value = currentVolume;
+    if (volumeValueSpan) volumeValueSpan.textContent = `${Math.round(currentVolume * 100)}%`;
+    if (muteCheckbox) muteCheckbox.checked = isMuted;
 }
 
 function saveAudioSettings() {
-  localStorage.setItem(LS_KEY_VOLUME, String(currentVolume));
-  localStorage.setItem(LS_KEY_MUTED, String(isMuted));
+    localStorage.setItem(LS_KEY_VOLUME, String(currentVolume));
+    localStorage.setItem(LS_KEY_MUTED, String(isMuted));
 }
 
-// NOVA FUNÇÃO: Tenta desbloquear o áudio
 function unlockAudio() {
-  if (musicStarted) return; // Já desbloqueado
-  console.log("Tentando desbloquear áudio...");
+    if (musicStarted) return;
+    console.log("Tentando desbloquear áudio...");
 
-	  // Toca todos os áudios e pausa (técnica para "acordar" o áudio no celular/browser)
-	  // O .play() deve ser chamado em todos os elementos de áudio para desbloqueá-los.
-	  allAudio.forEach(audio => {
-	      const playPromise = audio.play();
-	      if (playPromise !== undefined) {
-	          playPromise.then(_ => {
-	              audio.pause();
-	              audio.currentTime = 0;
-	          }).catch(e => console.warn("Erro ao 'acordar' áudio:", e.message));
-	      }
-	  });
-	  
-	  // Agora tenta tocar a música de fundo
-	  playMusic();
+    allAudio.forEach(audio => {
+        audio.play().catch(e => console.warn("Erro ao 'acordar' áudio:", e.message));
+        audio.pause();
+        audio.currentTime = 0;
+    });
+    
+    playMusic();
 }
 
 function playMusic() {
-  if (musicStarted && !bgMusic.paused) return; // Já tocando
-  
-	  if (bgMusic && bgMusic.paused && !paused && running && !isGameOver) {
-     applyAudioSettings();
-     let promise = bgMusic.play();
-     if (promise !== undefined) {
-       promise.then(_ => {
-         musicStarted = true;
-         console.log("Música iniciada!");
-       }).catch(e => {
-         musicStarted = false;
-         console.warn("Autoplay da música bloqueado. Aguardando interação.");
-       });
-     }
-  }
+    if (musicStarted && !bgMusic.paused) return;
+    
+    if (bgMusic && bgMusic.paused && !paused && running && !isGameOver) {
+        applyAudioSettings();
+        let promise = bgMusic.play();
+        if (promise !== undefined) {
+            promise.then(_ => {
+                musicStarted = true;
+                console.log("Música iniciada!");
+            }).catch(e => {
+                musicStarted = false;
+                console.warn("Autoplay da música bloqueado. Aguardando interação.");
+            });
+        }
+    }
 }
 
 function stopMusic() {
-  if (bgMusic) bgMusic.pause();
+    if (bgMusic) bgMusic.pause();
 }
 
 function playSound(sound) {
-  // Se a música não começou, cada som tentará iniciá-la
-  if (!musicStarted) {
-    playMusic();
-  }
-  
-  if (sound && !isMuted) {
-    sound.currentTime = 0;
-    sound.volume = currentVolume;
-    sound.play().catch(e => console.warn("Erro ao tocar som:", e.message));
-  }
+    if (!musicStarted) {
+        playMusic();
+    }
+    
+    if (sound && !isMuted) {
+        sound.currentTime = 0;
+        sound.volume = currentVolume;
+        sound.play().catch(e => console.warn("Erro ao tocar som:", e.message));
+    }
 }
 
 // ==================== Temporizador ====================
 
 function formatarTempo(segundos) {
-  const m = Math.floor(segundos / 60);
-  const s = segundos % 60;
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    const m = Math.floor(segundos / 60);
+    const s = segundos % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
 function iniciarTemporizador() {
-  if (!tempoInicio) tempoInicio = Date.now();
-  if (tempoInterval) clearInterval(tempoInterval);
+    if (!tempoInicio) tempoInicio = Date.now();
+    if (tempoInterval) clearInterval(tempoInterval);
 
-  tempoInterval = setInterval(() => {
-    if (!running || paused || isGameOver) return;
-    const segundos = Math.floor((Date.now() - tempoInicio) / 1000);
-    if (elTempo) elTempo.textContent = formatarTempo(segundos);
-  }, 1000);
+    tempoInterval = setInterval(() => {
+        if (!running || paused || isGameOver) return;
+        const segundos = Math.floor((Date.now() - tempoInicio) / 1000);
+        if (elTempo) elTempo.textContent = formatarTempo(segundos);
+    }, 1000);
 }
 
 function pararTemporizador() {
-  if (tempoInterval) {
-    clearInterval(tempoInterval);
-    tempoInterval = null;
-  }
+    if (tempoInterval) {
+        clearInterval(tempoInterval);
+        tempoInterval = null;
+    }
 }
 
 // ==================== Jogo ====================
 
 function spawnPiece(){
-  const shape = clone(rand(SHAPES));
-  const color = rand(PALETTE);
-  return {
-    shape,
-    color,
-    x: Math.floor((COLS - shape[0].length) / 2),
-    y: 0 
-  };
+    const shape = clone(rand(SHAPES));
+    const color = rand(PALETTE);
+    return {
+        shape,
+        color,
+        x: Math.floor((COLS - shape[0].length) / 2),
+        y: -shape.length
+    };
 }
 
 function resetGameState(){
-  if (!playerName) {
-    const n = prompt("Digite seu nome (será usado para recorde):", "Jogador");
-    playerName = (n && n.trim()) ? n.trim() : "Jogador";
-    localStorage.setItem(LS_KEY_PLAYER, playerName);
-  }
+    if (!playerName) {
+        const n = prompt("Digite seu nome (será usado para recorde):", "Jogador");
+        playerName = (n && n.trim()) ? n.trim() : "Jogador";
+        localStorage.setItem(LS_KEY_PLAYER, playerName);
+    }
 
-  board = makeBoard(ROWS, COLS);
-  current = spawnPiece();
-  nextPiece = spawnPiece();
-  score = 0;
-  lines = 0;
-  level = 1;
-  dropMs = DROP_MS_START;
-  paused = false;
-  running = true;
-  isGameOver = false;
-  
-  // Reseta a música
-  stopMusic();
-  musicStarted = false; 
-  if (bgMusic) bgMusic.currentTime = 0;
-  
-  updateHUD();
-  drawNext();
-  render();
+    board = makeBoard(ROWS, COLS);
+    current = spawnPiece();
+    nextPiece = spawnPiece();
+    score = 0;
+    lines = 0;
+    level = 1;
+    dropMs = DROP_MS_START;
+    paused = false;
+    running = true;
+    isGameOver = false;
+    
+    stopMusic();
+    musicStarted = false;
+    if (bgMusic) bgMusic.currentTime = 0;
+    
+    updateHUD();
+    drawNext();
+    render();
 
-  pararTemporizador();
-  if (elTempo) elTempo.textContent = "00:00";
-  tempoInicio = Date.now();
-  iniciarTemporizador();
-  
-  if (timer) { clearInterval(timer); timer = null; }
-  startLoop();
+    pararTemporizador();
+    if (elTempo) elTempo.textContent = "00:00";
+    tempoInicio = Date.now();
+    iniciarTemporizador();
+    
+    if (timer) { clearInterval(timer); timer = null; }
+    startLoop();
 }
 
 function drawCell(x, y, color){
-  ctx.fillStyle = color;
-  ctx.fillRect(x*SIZE, y*SIZE, SIZE, SIZE);
-  ctx.strokeStyle = "rgba(0,0,0,.35)";
-  ctx.strokeRect(x*SIZE, y*SIZE, SIZE, SIZE);
+    ctx.fillStyle = color;
+    ctx.fillRect(x*SIZE, y*SIZE, SIZE, SIZE);
+    ctx.strokeStyle = "rgba(0,0,0,.35)";
+    ctx.strokeRect(x*SIZE, y*SIZE, SIZE, SIZE);
 }
 
 function drawBoard(){
-  ctx.clearRect(0,0,canvas.width, canvas.height);
-  for(let y=0;y<ROWS;y++){
-    for(let x=0;x<COLS;x++){
-      if(board[y][x]) drawCell(x,y,board[y][x]);
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+    for(let y=0;y<ROWS;y++){
+        for(let x=0;x<COLS;x++){
+            if(board[y][x]) drawCell(x,y,board[y][x]);
+        }
     }
-  }
 }
 
 function drawPiece(p){
-  for(let y=0;y<p.shape.length;y++){
-    for(let x=0;x<p.shape[y].length;x++){
-      if(p.shape[y][x]){
-        const gx = p.x + x;
-        const gy = p.y + y;
-        if(gy>=0) drawCell(gx, gy, p.color);
-      }
+    for(let y=0;y<p.shape.length;y++){
+        for(let x=0;x<p.shape[y].length;x++){
+            if(p.shape[y][x]){
+                const gx = p.x + x;
+                const gy = p.y + y;
+                if(gy>=0) drawCell(gx, gy, p.color);
+            }
+        }
     }
-  }
 }
 
 function drawNext(){
-  if(!nctx) return;
-  const s = 18;
-  nctx.clearRect(0,0,nextCanvas.width,nextCanvas.height);
-  
-  const canvasWidth = nextCanvas.width;
-  const canvasHeight = nextCanvas.height;
+    if(!nctx) return;
+    const s = SIZE;
+    nctx.clearRect(0,0,nextCanvas.width,nextCanvas.height);
+    
+    const canvasWidth = nextCanvas.width;
+    const canvasHeight = nextCanvas.height;
 
-  const pw = nextPiece.shape[0].length * s;
-  const ph = nextPiece.shape.length * s;
-  const offX = Math.floor((canvasWidth - pw)/2);
-  const offY = Math.floor((canvasHeight - ph)/2);
+    const pw = nextPiece.shape[0].length * s;
+    const ph = nextPiece.shape.length * s;
+    const offX = Math.floor((canvasWidth - pw)/2);
+    const offY = Math.floor((canvasHeight - ph)/2);
 
-  for(let y=0;y<nextPiece.shape.length;y++){
-    for(let x=0;x<nextPiece.shape[y].length;x++){
-      if(nextPiece.shape[y][x]){
-        nctx.fillStyle = nextPiece.color;
-        nctx.fillRect(offX+x*s, offY+y*s, s, s);
-        nctx.strokeStyle = "rgba(0,0,0,.35)";
-        nctx.strokeRect(offX+x*s, offY+y*s, s, s);
-      }
+    for(let y=0;y<nextPiece.shape.length;y++){
+        for(let x=0;x<nextPiece.shape[y].length;x++){
+            if(nextPiece.shape[y][x]){
+                nctx.fillStyle = nextPiece.color;
+                nctx.fillRect(offX+x*s, offY+y*s, s, s);
+                nctx.strokeStyle = "rgba(0,0,0,.35)";
+                nctx.strokeRect(offX+x*s, offY+y*s, s, s);
+            }
+        }
     }
-  }
 }
 
 function collide(p, dx=0, dy=0, shape=p.shape){
-  for(let y=0;y<shape.length;y++){
-    for(let x=0;x<shape[y].length;x++){
-      if(!shape[y][x]) continue;
-      const nx = p.x + x + dx;
-      const ny = p.y + y + dy;
-      if(nx<0 || nx>=COLS || ny>=ROWS) return true;
-      if(ny>=0 && board[ny][nx]) return true;
+    for(let y=0;y<shape.length;y++){
+        for(let x=0;x<shape[y].length;x++){
+            if(!shape[y][x]) continue;
+            const nx = p.x + x + dx;
+            const ny = p.y + y + dy;
+            if(nx<0 || nx>=COLS || ny>=ROWS) return true;
+            if(ny>=0 && board[ny][nx] !== 0) return true;
+        }
     }
-  }
-  return false;
+    return false;
 }
 
 function merge(p){
-  for(let y=0;y<p.shape.length;y++){
-    for(let x=0;x<p.shape[y].length;x++){
-      if(p.shape[y][x]){
-        const gx = p.x + x;
-        const gy = p.y + y;
-        if(gy>=0) board[gy][gx] = p.color;
-      }
+    for(let y=0;y<p.shape.length;y++){
+        for(let x=0;x<p.shape[y].length;x++){
+            if(p.shape[y][x]){
+                const gx = p.x + x;
+                const gy = p.y + y;
+                if(gy>=0) board[gy][gx] = p.color;
+            }
+        }
     }
-  }
 }
 
 function rotateMatrix(mat){
-  const h = mat.length, w = mat[0].length;
-  const out = Array.from({length:w},()=>Array(h).fill(0));
-  for(let y=0;y<h;y++){
-    for(let x=0;x<w;x++){
-      out[x][h-1-y] = mat[y][x];
+    const h = mat.length, w = mat[0].length;
+    const out = Array.from({length:w},()=>Array(h).fill(0));
+    for(let y=0;y<h;y++){
+        for(let x=0;x<w;x++){
+            out[x][h-1-y] = mat[y][x];
+        }
     }
-  }
-  return out;
+    return out;
 }
 
 function rotatePiece(){
-  const rotated = rotateMatrix(current.shape);
-  const kicks = [0, -1, 1, -2, 2];
-  for(const k of kicks){
-    if(!collide(current, k, 0, rotated)){
-      current.shape = rotated;
-      current.x += k;
-      return;
+    const rotated = rotateMatrix(current.shape);
+    const kicks = [0, -1, 1, -2, 2];
+    for(const k of kicks){
+        if(!collide(current, k, 0, rotated)){
+            current.shape = rotated;
+            current.x += k;
+            return;
+        }
     }
-  }
 }
 
 function clearLines(){
-  let cleared = 0;
-  for(let y=ROWS-1; y>=0; y--){
-    if(board[y].every(c=>c)){
-      board.splice(y,1);
-      board.unshift(Array(COLS).fill(0));
-      cleared++;
-      y++;
+    let cleared = 0;
+    for(let y=ROWS-1; y>=0; y--){
+        if(board[y].every(c=>c)){
+            board.splice(y,1);
+            board.unshift(Array(COLS).fill(0));
+            cleared++;
+            y++;
+        }
     }
-  }
-  if(cleared){
-    playSound(lineClearSound); // Toca efeito
-    
-    let add = 0;
-    if(cleared === 1) add = 10;
-    else if(cleared === 2) add = 20;
-    else if(cleared === 3) add = 30;
-    else if(cleared >= 4) add = 40;
+    if(cleared){
+        playSound(lineClearSound);
+        
+        let add = 0;
+        if(cleared === 1) add = 10;
+        else if(cleared === 2) add = 20;
+        else if(cleared === 3) add = 30;
+        else if(cleared >= 4) add = 40;
 
-    score += add;
-    lines += cleared;
+        score += add;
+        lines += cleared;
 
-    const newLevel = Math.floor(lines / LINES_PER_LEVEL) + 1;
-    if(newLevel !== level){
-      level = newLevel;
-      dropMs = Math.max(120, DROP_MS_START - (level-1)*SPEED_STEP);
-      restartLoop();
+        const newLevel = Math.floor(lines / LINES_PER_LEVEL) + 1;
+        if(newLevel !== level){
+            level = newLevel;
+            dropMs = Math.max(120, DROP_MS_START - (level-1)*SPEED_STEP);
+            restartLoop();
+        }
+        updateHUD();
     }
-    updateHUD();
-  }
 }
 
 function updateHUD(){
-  if(elScore)  elScore.textContent  = score;
-  if(elLinhas) elLinhas.textContent = lines;
-  if(recordDisplay) recordDisplay.textContent = `${highScore} (${recordName})`;
+    if(elScore) elScore.textContent = score;
+    if(elLinhas) elLinhas.textContent = lines;
+    if(recordDisplay) recordDisplay.textContent = `${highScore} (${recordName})`;
 }
 
 // ==================== Render & GameOver ====================
 
 function render(){
-  drawBoard();
-  drawPiece(current);
+    drawBoard();
+    drawPiece(current);
 }
 
 function gameOver() {
-  running = false;
-  paused = true;
-  isGameOver = true;
+    running = false;
+    isGameOver = true;
 
-  stopMusic(); 
-  playSound(gameOverSound); 
+    stopMusic();
+    playSound(gameOverSound);
 
-  pararTemporizador();
+    pararTemporizador();
 
-  const tempoFinalSeg = Math.floor((Date.now() - tempoInicio) / 1000);
-  if (elFinalTime) elFinalTime.textContent = formatarTempo(tempoFinalSeg);
+    const tempoFinalSeg = Math.floor((Date.now() - tempoInicio) / 1000);
+    if (elFinalTime) elFinalTime.textContent = formatarTempo(tempoFinalSeg);
 
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
-  }
+    if (timer) {
+        clearInterval(timer);
+        timer = null;
+    }
 
-  finalScoreEl.textContent = score;
+    finalScoreEl.textContent = score;
 
-  if (score > highScore) {
-    newRecordBlock.style.display = "block";
-    newRecordNameInput.value = playerName || "";
-  } else {
-    newRecordBlock.style.display = "none";
-  }
+    if (score > highScore) {
+        newRecordBlock.style.display = "block";
+        newRecordNameInput.value = playerName || "";
+    } else {
+        newRecordBlock.style.display = "none";
+    }
 
-  try {
-    if (!gameoverDialog.open) gameoverDialog.showModal();
-  } catch(e) {
-    try { gameoverDialog.show(); } catch(e2){}
-  }
+    // Tenta mostrar o diálogo de game over
+    if (gameoverDialog) {
+        try {
+            if (!gameoverDialog.open) gameoverDialog.showModal();
+        } catch(e) {
+            // Fallback para show() se showModal() falhar (navegadores mais antigos)
+            if (!gameoverDialog.open) gameoverDialog.show();
+        }
+    }
 }
 
 // ==================== Loop, start/restart ====================
 
 function tick(){
-  if(!running || paused || isGameOver) return;
+    if(!running || paused || isGameOver) return;
 
-  if(!collide(current, 0, 1)){
-    current.y++;
-  } else {
-    merge(current);
-    clearLines();
+    if(!collide(current, 0, 1)){
+        // A peça pode descer
+        current.y++;
+    } else { 
+        // A peça colidiu (não pode descer mais)
+        
+        // ===================================
+        // NOVA LÓGICA DE GAME OVER
+        // ===================================
+        // Se a peça colidiu, mas sua posição 'y' ainda é negativa,
+        // significa que ela não coube inteiramente no tabuleiro.
+        if (current.y < 0) {
+            gameOver();
+            return; // Para o jogo
+        }
+        // ===================================
+        // FIM DA NOVA LÓGICA
+        // ===================================
 
-    current = nextPiece;
-    nextPiece = spawnPiece();
+        // Se colidiu, mas y >= 0, é um pouso normal.
+        merge(current); // Funde a peça ao tabuleiro
+        clearLines(); // Limpa linhas completas
 
-    if (collide(current, 0, 0)) {
-      gameOver();
-      return;
+        // Pega a próxima peça
+        current = nextPiece;
+        nextPiece = spawnPiece();
+
+        // (A lógica de game over original que estava aqui foi removida)
+
+        drawNext();
     }
 
-    drawNext();
-  }
-
-  render();
+    render(); // Renderiza o estado atual
 }
 
 function startLoop(){
-  if(!running || isGameOver) return;
-  if(timer) clearInterval(timer);
-  timer = setInterval(tick, dropMs);
+    if(!running || isGameOver) return;
+    if(timer) clearInterval(timer);
+    timer = setInterval(tick, dropMs);
 }
+
 function restartLoop(){
-  if(timer) clearInterval(timer);
-  timer = setInterval(tick, dropMs);
+    if(timer) clearInterval(timer);
+    timer = setInterval(tick, dropMs);
 }
 
 // ==================== Pause/Settings control ====================
 
 function togglePause(){
-  if (!running || isGameOver) return;
+    if (!running || isGameOver) return;
 
-  if (settingsOverlay && settingsOverlay.style.display === "flex") {
-     settingsOverlay.style.display = "none";
-     return;
-  }
+    if (settingsOverlay && settingsOverlay.style.display === "flex") {
+        settingsOverlay.style.display = "none";
+        return;
+    }
 
-  paused = !paused;
+    paused = !paused;
 
-  if (paused) {
-    // pause:
-    stopMusic(); 
-    if (timer) { clearInterval(timer); timer = null; }
-    pararTemporizador();
-    if (pauseOverlay) pauseOverlay.style.display = "flex";
-    if (pausedText) pausedText.style.display = "block";
-    if (pauseBtn) pauseBtn.textContent = "▶ Continuar";
-  } else {
-    // resume:
-    playMusic(); 
-    const elapsed = parseTempo(elTempo.textContent) * 1000;
-    tempoInicio = Date.now() - elapsed;
-    iniciarTemporizador();
-    startLoop();
-    if (pauseOverlay) pauseOverlay.style.display = "none";
-    if (pausedText) pausedText.style.display = "none";
-    if (pauseBtn) pauseBtn.textContent = "⏸ Pausar";
-  }
+    if (paused) {
+        stopMusic();
+        if (timer) { clearInterval(timer); timer = null; }
+        pararTemporizador();
+        if (pauseOverlay) pauseOverlay.style.display = "flex";
+        if (pauseBtn) pauseBtn.textContent = "▶ Continuar";
+    } else {
+        playMusic();
+        const elapsed = parseTempo(elTempo.textContent) * 1000;
+        tempoInicio = Date.now() - elapsed;
+        iniciarTemporizador();
+        startLoop();
+        if (pauseOverlay) pauseOverlay.style.display = "none";
+        if (pauseBtn) pauseBtn.textContent = "⏸ Pausar";
+    }
 }
 
 function toggleSettings() {
-  if (isGameOver) return;
-  const isSettingsOpen = settingsOverlay.style.display === "flex";
+    if (isGameOver) return;
+    const isSettingsOpen = settingsOverlay.style.display === "flex";
 
-  if (isSettingsOpen) {
-    // Fechando Settings
-    settingsOverlay.style.display = "none";
-    
-    if (pauseOverlay.style.display !== "flex") {
-      paused = false;
-      playMusic();
-      const elapsed = parseTempo(elTempo.textContent) * 1000;
-      tempoInicio = Date.now() - elapsed;
-      iniciarTemporizador();
-      startLoop();
+    if (isSettingsOpen) {
+        settingsOverlay.style.display = "none";
+        
+        if (pauseOverlay.style.display !== "flex") {
+            paused = false;
+            playMusic();
+            const elapsed = parseTempo(elTempo.textContent) * 1000;
+            tempoInicio = Date.now() - elapsed;
+            iniciarTemporizador();
+            startLoop();
+        }
+    } else {
+        settingsOverlay.style.display = "flex";
+        
+        if (!paused) {
+            paused = true;
+            stopMusic();
+            if (timer) { clearInterval(timer); timer = null; }
+            pararTemporizador();
+        }
     }
-  } else {
-    // Abrindo Settings
-    settingsOverlay.style.display = "flex";
-    
-    if (!paused) {
-      paused = true;
-      stopMusic();
-      if (timer) { clearInterval(timer); timer = null; }
-      pararTemporizador();
-    }
-  }
 }
 
 function parseTempo(texto) {
-  const parts = (texto || "00:00").split(':').map(n => parseInt(n,10) || 0);
-  return parts[0]*60 + parts[1];
+    const parts = (texto || "00:00").split(':').map(n => parseInt(n,10) || 0);
+    return parts[0]*60 + parts[1];
 }
 
 // ==================== Controles ====================
 
 document.addEventListener("keydown",(e)=>{
-  
-  // Fallback da música no primeiro toque de tecla
-  if (!musicStarted && ["arrowleft", "arrowright", "arrowdown", "arrowup", " ", "e"].includes(e.key.toLowerCase())) {
-      unlockAudio();
-  }
-
-  if(e.key.toLowerCase()==="r"){
-      if(timer) { clearInterval(timer); timer = null; }
-      resetGameState();
-      return;
-  }
-
-  if(e.key.toLowerCase()==="p"){
-    togglePause();
-    return;
-  }
-  
-  if(e.key === "Escape" && settingsOverlay.style.display === "flex") {
-    toggleSettings();
-    return;
-  }
-
-  if(!running || isGameOver || paused) return;
-
-  if(["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", " "].includes(e.key)){
-    e.preventDefault();
-  }
-
-  if(e.key === "ArrowLeft"){
-    if(!collide(current, -1, 0)) current.x--;
-  }else if(e.key === "ArrowRight"){
-    if(!collide(current, 1, 0)) current.x++;
-  }else if(e.key === "ArrowDown"){
-    if(!collide(current, 0, 1)) current.y++;
-  }else if(e.key === " "){
-    let steps = 0;
-    while(!collide(current, 0, 1)){ current.y++; steps++; }
-    score += steps * 2; updateHUD();
-    merge(current);
-    clearLines();
-    current = nextPiece;
-    nextPiece = spawnPiece();
-    if (collide(current, 0, 0)) {
-      gameOver();
-      return;
+    
+    if (!musicStarted && ["arrowleft", "arrowright", "arrowdown", "arrowup", " ", "e"].includes(e.key.toLowerCase())) {
+        unlockAudio();
     }
-    drawNext();
-  }else if(e.key === "ArrowUp" || e.key.toLowerCase()==="e"){
-    rotatePiece();
-  }
-  render();
+
+    if(e.key.toLowerCase()==="r"){
+        if(timer) { clearInterval(timer); timer = null; }
+        resetGameState();
+        return;
+    }
+
+    if(e.key.toLowerCase()==="p"){
+        togglePause();
+        return;
+    }
+    
+    if(e.key === "Escape" && settingsOverlay.style.display === "flex") {
+        toggleSettings();
+        return;
+    }
+
+    if(!running || isGameOver || paused) return;
+
+    if(["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", " "].includes(e.key)){
+        e.preventDefault();
+    }
+
+    if(e.key === "ArrowLeft"){
+        if(!collide(current, -1, 0)) current.x--;
+    }else if(e.key === "ArrowRight"){
+        if(!collide(current, 1, 0)) current.x++;
+    }else if(e.key === "ArrowDown"){
+        if(!collide(current, 0, 1)) current.y++;
+    }else if(e.key === "ArrowUp"){
+        rotatePiece();
+    }
+    render();
 });
 
 // Pause / resume buttons
@@ -611,79 +604,77 @@ if (settingsBtn) settingsBtn.addEventListener('click', toggleSettings);
 if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', toggleSettings);
 
 if (volumeSlider) {
-  volumeSlider.addEventListener('input', (e) => {
-    currentVolume = parseFloat(e.target.value);
-    isMuted = false;
-    applyAudioSettings();
-    saveAudioSettings();
-  });
+    volumeSlider.addEventListener('input', (e) => {
+        currentVolume = parseFloat(e.target.value);
+        isMuted = false;
+        applyAudioSettings();
+        saveAudioSettings();
+    });
 }
 
 if (muteCheckbox) {
-  muteCheckbox.addEventListener('change', (e) => {
-    isMuted = e.target.checked;
-    applyAudioSettings();
-    saveAudioSettings();
-  });
+    muteCheckbox.addEventListener('change', (e) => {
+        isMuted = e.target.checked;
+        applyAudioSettings();
+        saveAudioSettings();
+    });
 }
 
 // Save new record button
 if (saveRecordBtn) {
-  saveRecordBtn.addEventListener('click', () => {
-    const name = (newRecordNameInput.value || playerName || "Jogador").trim();
-    highScore = score;
-    recordName = name || "Jogador";
-    localStorage.setItem(LS_KEY_SCORE, String(highScore));
-    localStorage.setItem(LS_KEY_NAME, recordName);
-    recordNameSpan.textContent = recordName;
-    if(recordDisplay) recordDisplay.textContent = `${highScore} (${recordName})`;
-    newRecordBlock.style.display = "none";
-    try { gameoverDialog.close(); } catch(e){}
-  });
+    saveRecordBtn.addEventListener('click', () => {
+        const name = (newRecordNameInput.value || playerName || "Jogador").trim();
+        highScore = score;
+        recordName = name || "Jogador";
+        localStorage.setItem(LS_KEY_SCORE, String(highScore));
+        localStorage.setItem(LS_KEY_NAME, recordName);
+        recordNameSpan.textContent = recordName;
+        if(recordDisplay) recordDisplay.textContent = `${highScore} (${recordName})`;
+        newRecordBlock.style.display = "none";
+        try { gameoverDialog.close(); } catch(e){}
+    });
 }
 
 // replay button
 if (replayBtn) {
-  replayBtn.addEventListener('click', () => {
-    try { gameoverDialog.close(); } catch(e){}
-    resetGameState();
-  });
+    replayBtn.addEventListener('click', () => {
+        try { gameoverDialog.close(); } catch(e){}
+        resetGameState();
+    });
 }
 
 // ==================== Inicialização ====================
 
 function init(){
-  canvas.width  = COLS * SIZE;
-  canvas.height = ROWS * SIZE;
+    canvas.width = COLS * SIZE;
+    canvas.height = ROWS * SIZE;
 
-  if (nextCanvas && !nextCanvas.width) nextCanvas.width = 150;
-  if (nextCanvas && !nextCanvas.height) nextCanvas.height = 100;
-  
-  applyAudioSettings(); 
-  resetGameState();
-
-  const instructions = document.getElementById('instructions');
-  const close_button = document.getElementById('close');
-
-  if(instructions && close_button){
-    try { instructions.showModal(); } catch(e) { try { instructions.show(); } catch(e2) {} }
+    if (nextCanvas && !nextCanvas.width) nextCanvas.width = 150;
+    if (nextCanvas && !nextCanvas.height) nextCanvas.height = 100;
     
-    // ****** CORREÇÃO PRINCIPAL DE ÁUDIO ******
-    // Tenta desbloquear o áudio QUANDO o usuário clica no botão "Close"
-    close_button.addEventListener('click', () => { 
-      instructions.close(); 
-      unlockAudio(); // <-- Tenta iniciar o áudio com esta interação
-    });
-    
-    instructions.addEventListener('click', (event) => {
-      if(event.target === instructions){ 
-        instructions.close(); 
-        unlockAudio(); // <-- Tenta iniciar o áudio com esta interação também
-      }
-    });
-  }
+    applyAudioSettings();
+    resetGameState();
+
+    const instructions = document.getElementById('instructions');
+    const close_button = document.getElementById('close');
+
+    if(instructions && close_button){
+        try { instructions.showModal(); } catch(e) { try { instructions.show(); } catch(e2) {} }
+        
+        close_button.addEventListener('click', () => { 
+            instructions.close(); 
+            unlockAudio();
+        });
+        
+        instructions.addEventListener('click', (event) => {
+            if(event.target === instructions){ 
+                instructions.close(); 
+                unlockAudio();
+            }
+        });
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  init();
+    init();
 });

@@ -318,7 +318,7 @@ function collide(p, dx=0, dy=0, shape=p.shape){
             const nx = p.x + x + dx;
             const ny = p.y + y + dy;
             if(nx<0 || nx>=COLS || ny>=ROWS) return true;
-            if(ny>=0 && board[ny][nx] !== 0) return true;
+            if(ny>=0 && board[ny][nx]) return true;
         }
     }
     return false;
@@ -430,14 +430,11 @@ function gameOver() {
         newRecordBlock.style.display = "none";
     }
 
-    // Tenta mostrar o diálogo de game over
-    if (gameoverDialog) {
-        try {
-            if (!gameoverDialog.open) gameoverDialog.showModal();
-        } catch(e) {
-            // Fallback para show() se showModal() falhar (navegadores mais antigos)
-            if (!gameoverDialog.open) gameoverDialog.show();
-        }
+    try {
+        if (!gameoverDialog.open) gameoverDialog.showModal();
+    } catch(e) {
+        if (!gameoverDialog.open) gameoverDialog.showModal();
+
     }
 }
 

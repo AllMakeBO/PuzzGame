@@ -21,6 +21,36 @@ const SHAPES = [
     [[0,1,1],[1,1,0]], // Z
 ];
 
+// ===================================
+// === MODIFICAÇÕES EASTER EGG (Início) ===
+// ===================================
+
+let isClassicMode = false;
+const CLASSIC_CODE = ["t", "8", "4"]; // A sequência secreta
+let classicCodeProgress = [];        // Onde o usuário está na sequência
+
+const CLASSIC_PALETTE = ["#0f0", "#0e0", "#0d0", "#0c0", "#0b0", "#0a0"]; // Tons de verde
+const CLASSIC_BLACK = "#000";
+const CLASSIC_STROKE = "#030"; // Contorno verde escuro
+
+// Nomes dos seus arquivos de áudio originais (lidos do HTML)
+const originalSounds = {
+    music: "soundtrack.mp3",
+    line: "line_clear.mp3",
+    over: "game-over.mp3"
+};
+
+// Arquivos que VOCÊ DEVE CRIAR para o modo retrô
+const classicSounds = {
+    music: "soundtrack_retro.mp3", // Ex: Um chiptune
+    line: "line_clear_retro.mp3",  // Ex: Um "bipe"
+    over: "game_over_retro.mp3"    // Ex: Um som de "bipe" descendente
+};
+
+// ===================================
+// === MODIFICAÇÕES EASTER EGG (Fim) ===
+// ===================================
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const nextCanvas = document.getElementById("canvanext") || null;
@@ -214,7 +244,8 @@ function pararTemporizador() {
 
 function spawnPiece(){
     const shape = clone(rand(SHAPES));
-    const color = rand(PALETTE);
+    // MODIFICAÇÃO EASTER EGG: Escolhe da paleta correta
+    const color = isClassicMode ? rand(CLASSIC_PALETTE) : rand(PALETTE);
     return {
         shape,
         color,
@@ -261,12 +292,20 @@ function resetGameState(){
 function drawCell(x, y, color){
     ctx.fillStyle = color;
     ctx.fillRect(x*SIZE, y*SIZE, SIZE, SIZE);
-    ctx.strokeStyle = "rgba(0,0,0,.35)";
+    // MODIFICAÇÃO EASTER EGG: Muda o contorno
+    ctx.strokeStyle = isClassicMode ? CLASSIC_STROKE : "rgba(0,0,0,.35)";
     ctx.strokeRect(x*SIZE, y*SIZE, SIZE, SIZE);
 }
 
 function drawBoard(){
     ctx.clearRect(0,0,canvas.width, canvas.height);
+    
+    // MODIFICAÇÃO EASTER EGG: Desenha o fundo preto
+    if (isClassicMode) {
+        ctx.fillStyle = CLASSIC_BLACK;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    
     for(let y=0;y<ROWS;y++){
         for(let x=0;x<COLS;x++){
             if(board[y][x]) drawCell(x,y,board[y][x]);
@@ -291,6 +330,12 @@ function drawNext(){
     const s = SIZE;
     nctx.clearRect(0,0,nextCanvas.width,nextCanvas.height);
     
+    // MODIFICAÇÃO EASTER EGG: Desenha o fundo preto
+    if (isClassicMode) {
+        nctx.fillStyle = CLASSIC_BLACK;
+        nctx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+    }
+    
     const canvasWidth = nextCanvas.width;
     const canvasHeight = nextCanvas.height;
 
@@ -302,9 +347,10 @@ function drawNext(){
     for(let y=0;y<nextPiece.shape.length;y++){
         for(let x=0;x<nextPiece.shape[y].length;x++){
             if(nextPiece.shape[y][x]){
-                nctx.fillStyle = nextPiece.color;
+                nctx.fillStyle = nextPiece.color; // Cor já vem correta de spawnPiece
                 nctx.fillRect(offX+x*s, offY+y*s, s, s);
-                nctx.strokeStyle = "rgba(0,0,0,.35)";
+                // MODIFICAÇÃO EASTER EGG: Muda o contorno
+                nctx.strokeStyle = isClassicMode ? CLASSIC_STROKE : "rgba(0,0,0,.35)";
                 nctx.strokeRect(offX+x*s, offY+y*s, s, s);
             }
         }
@@ -489,6 +535,45 @@ function restartLoop(){
     timer = setInterval(tick, dropMs);
 }
 
+// ===================================
+// === NOVA FUNÇÃO - EASTER EGG ===
+// ===================================
+function toggleClassicMode() {
+    isClassicMode = !isClassicMode;
+    console.log("Modo Clássico 1984: " + (isClassicMode ? "ATIVADO" : "DESATIVADO"));
+    
+    // 1. Alterna a classe CSS no body
+    // Usamos document.documentElement (o <html>) para o fundo da página
+    document.documentElement.classList.toggle("classic-1984", isClassicMode);
+    document.body.classList.toggle("classic-1984", isClassicMode);
+
+    // 2. Troca os sons
+    const wasPlaying = musicStarted && !bgMusic.paused;
+    const musicTime = bgMusic.currentTime;
+
+    if (isClassicMode) {
+        bgMusic.src = classicSounds.music;
+        if (lineClearSound) lineClearSound.src = classicSounds.line;
+        if (gameOverSound) gameOverSound.src = classicSounds.over;
+    } else {
+        bgMusic.src = originalSounds.music;
+        if (lineClearSound) lineClearSound.src = originalSounds.line;
+        if (gameOverSound) gameOverSound.src = originalSounds.over;
+    }
+    
+    // Recarrega e tenta tocar a música
+    allAudio.forEach(audio => audio.load());
+    bgMusic.currentTime = musicTime;
+    if (wasPlaying) {
+        playMusic();
+    }
+    applyAudioSettings(); // Re-aplica volume/mudo
+
+    // 3. Força a re-renderização do jogo com as novas cores
+    render();
+    drawNext();
+}
+
 // ==================== Pause/Settings control ====================
 
 function togglePause(){
@@ -552,7 +637,38 @@ function parseTempo(texto) {
 
 // ==================== Controles ====================
 
+// (O listener 'keyup' do Easter Egg foi removido)
+
 document.addEventListener("keydown",(e)=>{
+    
+    // ===================================
+    // === CÓDIGO EASTER EGG (Início) ===
+    // ===================================
+    
+    const key = e.key.toLowerCase();
+
+    // Lógica de sequência
+    // Se a tecla for a próxima da sequência, adiciona ao progresso
+    if (key === CLASSIC_CODE[classicCodeProgress.length]) {
+        classicCodeProgress.push(key);
+    } else {
+        // Se errar, reseta (mas ignora se for a primeira tecla certa de novo)
+        classicCodeProgress = (key === CLASSIC_CODE[0]) ? [key] : [];
+    }
+
+    // Se o progresso estiver completo, ativa o modo!
+    if (classicCodeProgress.length === CLASSIC_CODE.length) {
+        console.log("CÓDIGO SECRETO ATIVADO!");
+        toggleClassicMode();
+        classicCodeProgress = []; // Reseta para poder usar de novo
+        e.preventDefault();
+        return;
+    }
+    
+    // ===================================
+    // === CÓDIGO EASTER EGG (Fim) ===
+    // ===================================
+    
     
     if (!musicStarted && ["arrowleft", "arrowright", "arrowdown", "arrowup", " ", "e"].includes(e.key.toLowerCase())) {
         unlockAudio();
@@ -589,6 +705,15 @@ document.addEventListener("keydown",(e)=>{
     }else if(e.key === "ArrowUp"){
         rotatePiece();
     }
+    // MODIFICAÇÃO: Adicionado 'hard drop' com a tecla espaço
+    else if(e.key === " "){
+        while(!collide(current, 0, 1)){
+            current.y++;
+        }
+        // Após o hard drop, forçamos o 'tick' para travar a peça imediatamente
+        tick(); 
+    }
+    
     render();
 });
 

@@ -226,3 +226,49 @@ p{
     /* As dimensões do canvas serão definidas no HTML para evitar conflito com o JS */
   }
 }
+
+
+/* --- NOVOS ESTILOS ADICIONADOS --- */
+
+/* Estilos para Botões do HUD (Pause e Config) */
+.hud-btn {
+  margin-left: 8px; /* Adiciona espaço entre os botões */
+}
+
+/* Estilos para o Pop-up de Configurações */
+.settings-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 15px 0;
+  color: #efe027; /* Cor do texto do label */
+}
+
+.settings-group label {
+  font-size: 16px;
+  margin-right: 10px;
+  white-space: nowrap;
+}
+
+.settings-group input[type="range"] {
+  flex-grow: 1;
+  cursor: pointer;
+}
+
+.settings-group input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  margin-right: 5px;
+}
+
+.settings-group #volume-value {
+    min-width: 40px;
+    text-align: right;
+}
+
+/* Ajusta a cor dos links dentro do card de settings (igual ao pause) */
+#settings-overlay .pause-card a {
+  color: #60ffd1;
+  text-decoration: none;
+}

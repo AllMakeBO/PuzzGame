@@ -1,5 +1,6 @@
 // ==================== PuzzGame - script.js ====================
-// Versão adaptada com: temporizador, pause overlay, recorde com nome salvo no localStorage
+// Versão completa com: Áudio, Configurações, Pause, Recordes.
+// CORREÇÃO DE ÁUDIO: Inicia áudio no clique do pop-up.
 // ===============================================================
 
 const COLS = 12;
@@ -46,6 +47,21 @@ const newRecordNameInput = document.getElementById("new-record-name");
 const saveRecordBtn = document.getElementById("save-record-btn");
 const replayBtn = document.getElementById("replay-btn");
 
+// --- ELEMENTOS DE ÁUDIO E CONFIGURAÇÕES ---
+const bgMusic = document.getElementById("bg-music");
+const lineClearSound = document.getElementById("line-clear-sound");
+const gameOverSound = document.getElementById("game-over-sound");
+const allAudio = [bgMusic, lineClearSound, gameOverSound].filter(Boolean);
+
+// Settings elements
+const settingsBtn = document.getElementById("settings-btn");
+const settingsOverlay = document.getElementById("settings-overlay");
+const closeSettingsBtn = document.getElementById("close-settings-btn");
+const volumeSlider = document.getElementById("volume-slider");
+const volumeValueSpan = document.getElementById("volume-value");
+const muteCheckbox = document.getElementById("mute-checkbox");
+// --- FIM ELEMENTOS ---
+
 let isGameOver = false;
 
 let board;
@@ -69,6 +85,8 @@ let tempoInterval = null;
 const LS_KEY_SCORE = "gp_highscore";
 const LS_KEY_NAME  = "gp_recordname";
 const LS_KEY_PLAYER = "gp_playername";
+const LS_KEY_VOLUME = "gp_volume";
+const LS_KEY_MUTED = "gp_muted"; 
 
 // load record
 let highScore = parseInt(localStorage.getItem(LS_KEY_SCORE)) || 0;
@@ -76,8 +94,15 @@ let recordName = localStorage.getItem(LS_KEY_NAME) || "-";
 recordNameSpan.textContent = recordName;
 if(recordDisplay) recordDisplay.textContent = `${highScore} (${recordName})`;
 
-// player name (if not set, will prompt on first start)
+// player name
 let playerName = localStorage.getItem(LS_KEY_PLAYER) || null;
+
+// --- ESTADOS DE ÁUDIO ---
+let currentVolume = parseFloat(localStorage.getItem(LS_KEY_VOLUME)) || 0.5;
+let isMuted = (localStorage.getItem(LS_KEY_MUTED) === 'true') || false;
+let musicStarted = false; // Flag para controlar o autoplay
+// --- FIM ESTADOS ---
+
 
 // ==================== Helpers ====================
 
@@ -86,6 +111,78 @@ function makeBoard(rows, cols){
 }
 function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
 function clone(m){ return m.map(r => r.slice()); }
+
+// ==================== Áudio & Configurações ====================
+
+function applyAudioSettings() {
+  const effectiveVolume = isMuted ? 0 : currentVolume;
+  allAudio.forEach(audio => {
+    if (audio) {
+      audio.volume = effectiveVolume;
+      audio.muted = isMuted;
+    }
+  });
+  
+  if (volumeSlider) volumeSlider.value = currentVolume;
+  if (volumeValueSpan) volumeValueSpan.textContent = `${Math.round(currentVolume * 100)}%`;
+  if (muteCheckbox) muteCheckbox.checked = isMuted;
+}
+
+function saveAudioSettings() {
+  localStorage.setItem(LS_KEY_VOLUME, String(currentVolume));
+  localStorage.setItem(LS_KEY_MUTED, String(isMuted));
+}
+
+// NOVA FUNÇÃO: Tenta desbloquear o áudio
+function unlockAudio() {
+  if (musicStarted) return; // Já desbloqueado
+  console.log("Tentando desbloquear áudio...");
+
+  // Toca todos os áudios e pausa (técnica para "acordar" o áudio no celular/browser)
+  allAudio.forEach(audio => {
+      audio.play().catch(e => console.warn("Erro ao 'acordar' áudio:", e.message));
+      audio.pause();
+      audio.currentTime = 0;
+  });
+  
+  // Agora tenta tocar a música de fundo
+  playMusic();
+}
+
+function playMusic() {
+  if (musicStarted && !bgMusic.paused) return; // Já tocando
+  
+  if (bgMusic && bgMusic.paused && !paused && running && !isGameOver) {
+     applyAudioSettings();
+     let promise = bgMusic.play();
+     if (promise !== undefined) {
+       promise.then(_ => {
+         musicStarted = true;
+         console.log("Música iniciada!");
+       }).catch(e => {
+         musicStarted = false;
+         console.warn("Autoplay da música bloqueado. Aguardando interação.");
+       });
+     }
+  }
+}
+
+function stopMusic() {
+  if (bgMusic) bgMusic.pause();
+}
+
+function playSound(sound) {
+  // Se a música não começou, cada som tentará iniciá-la
+  if (!musicStarted) {
+    playMusic();
+  }
+  
+  if (sound && !isMuted) {
+    sound.currentTime = 0;
+    sound.volume = currentVolume;
+    sound.play().catch(e => console.warn("Erro ao tocar som:", e.message));
+  }
+}
 
 // ==================== Temporizador ====================
 
@@ -127,7 +224,6 @@ function spawnPiece(){
 }
 
 function resetGameState(){
-  // ask player name first time
   if (!playerName) {
     const n = prompt("Digite seu nome (será usado para recorde):", "Jogador");
     playerName = (n && n.trim()) ? n.trim() : "Jogador";
@@ -144,17 +240,21 @@ function resetGameState(){
   paused = false;
   running = true;
   isGameOver = false;
+  
+  // Reseta a música
+  stopMusic();
+  musicStarted = false; 
+  if (bgMusic) bgMusic.currentTime = 0;
+  
   updateHUD();
   drawNext();
   render();
 
-  // Reinicia o cronômetro
   pararTemporizador();
   if (elTempo) elTempo.textContent = "00:00";
   tempoInicio = Date.now();
   iniciarTemporizador();
-
-  // ensure timers
+  
   if (timer) { clearInterval(timer); timer = null; }
   startLoop();
 }
@@ -271,6 +371,8 @@ function clearLines(){
     }
   }
   if(cleared){
+    playSound(lineClearSound); // Toca efeito
+    
     let add = 0;
     if(cleared === 1) add = 10;
     else if(cleared === 2) add = 20;
@@ -308,6 +410,9 @@ function gameOver() {
   paused = true;
   isGameOver = true;
 
+  stopMusic(); 
+  playSound(gameOverSound); 
+
   pararTemporizador();
 
   const tempoFinalSeg = Math.floor((Date.now() - tempoInicio) / 1000);
@@ -320,7 +425,6 @@ function gameOver() {
 
   finalScoreEl.textContent = score;
 
-  // Se novo record, mostra bloco para salvar nome
   if (score > highScore) {
     newRecordBlock.style.display = "block";
     newRecordNameInput.value = playerName || "";
@@ -370,23 +474,29 @@ function restartLoop(){
   timer = setInterval(tick, dropMs);
 }
 
-// ==================== Pause control ====================
+// ==================== Pause/Settings control ====================
 
 function togglePause(){
   if (!running || isGameOver) return;
 
+  if (settingsOverlay && settingsOverlay.style.display === "flex") {
+     settingsOverlay.style.display = "none";
+     return;
+  }
+
   paused = !paused;
 
   if (paused) {
-    // pause: stop fall loop and tempo
+    // pause:
+    stopMusic(); 
     if (timer) { clearInterval(timer); timer = null; }
     pararTemporizador();
     if (pauseOverlay) pauseOverlay.style.display = "flex";
     if (pausedText) pausedText.style.display = "block";
     if (pauseBtn) pauseBtn.textContent = "▶ Continuar";
   } else {
-    // resume: restart timers; preserve elapsed time
-    // tempoInicio ajusta para continuar do ponto certo
+    // resume:
+    playMusic(); 
     const elapsed = parseTempo(elTempo.textContent) * 1000;
     tempoInicio = Date.now() - elapsed;
     iniciarTemporizador();
@@ -394,6 +504,35 @@ function togglePause(){
     if (pauseOverlay) pauseOverlay.style.display = "none";
     if (pausedText) pausedText.style.display = "none";
     if (pauseBtn) pauseBtn.textContent = "⏸ Pausar";
+  }
+}
+
+function toggleSettings() {
+  if (isGameOver) return;
+  const isSettingsOpen = settingsOverlay.style.display === "flex";
+
+  if (isSettingsOpen) {
+    // Fechando Settings
+    settingsOverlay.style.display = "none";
+    
+    if (pauseOverlay.style.display !== "flex") {
+      paused = false;
+      playMusic();
+      const elapsed = parseTempo(elTempo.textContent) * 1000;
+      tempoInicio = Date.now() - elapsed;
+      iniciarTemporizador();
+      startLoop();
+    }
+  } else {
+    // Abrindo Settings
+    settingsOverlay.style.display = "flex";
+    
+    if (!paused) {
+      paused = true;
+      stopMusic();
+      if (timer) { clearInterval(timer); timer = null; }
+      pararTemporizador();
+    }
   }
 }
 
@@ -405,6 +544,12 @@ function parseTempo(texto) {
 // ==================== Controles ====================
 
 document.addEventListener("keydown",(e)=>{
+  
+  // Fallback da música no primeiro toque de tecla
+  if (!musicStarted && ["arrowleft", "arrowright", "arrowdown", "arrowup", " ", "e"].includes(e.key.toLowerCase())) {
+      unlockAudio();
+  }
+
   if(e.key.toLowerCase()==="r"){
       if(timer) { clearInterval(timer); timer = null; }
       resetGameState();
@@ -413,6 +558,11 @@ document.addEventListener("keydown",(e)=>{
 
   if(e.key.toLowerCase()==="p"){
     togglePause();
+    return;
+  }
+  
+  if(e.key === "Escape" && settingsOverlay.style.display === "flex") {
+    toggleSettings();
     return;
   }
 
@@ -451,6 +601,27 @@ document.addEventListener("keydown",(e)=>{
 if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
 if (resumeBtn) resumeBtn.addEventListener('click', togglePause);
 
+// Settings listeners
+if (settingsBtn) settingsBtn.addEventListener('click', toggleSettings);
+if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', toggleSettings);
+
+if (volumeSlider) {
+  volumeSlider.addEventListener('input', (e) => {
+    currentVolume = parseFloat(e.target.value);
+    isMuted = false;
+    applyAudioSettings();
+    saveAudioSettings();
+  });
+}
+
+if (muteCheckbox) {
+  muteCheckbox.addEventListener('change', (e) => {
+    isMuted = e.target.checked;
+    applyAudioSettings();
+    saveAudioSettings();
+  });
+}
+
 // Save new record button
 if (saveRecordBtn) {
   saveRecordBtn.addEventListener('click', () => {
@@ -462,7 +633,6 @@ if (saveRecordBtn) {
     recordNameSpan.textContent = recordName;
     if(recordDisplay) recordDisplay.textContent = `${highScore} (${recordName})`;
     newRecordBlock.style.display = "none";
-    // fecha dialog e reinicia
     try { gameoverDialog.close(); } catch(e){}
   });
 }
@@ -483,22 +653,27 @@ function init(){
 
   if (nextCanvas && !nextCanvas.width) nextCanvas.width = 150;
   if (nextCanvas && !nextCanvas.height) nextCanvas.height = 100;
-
+  
+  applyAudioSettings(); 
   resetGameState();
 
-  // instructions handling (preserve your original logic)
   const instructions = document.getElementById('instructions');
   const close_button = document.getElementById('close');
 
   if(instructions && close_button){
     try { instructions.showModal(); } catch(e) { try { instructions.show(); } catch(e2) {} }
-    close_button.addEventListener('click', () => { instructions.close(); });
-    instructions.addEventListener('click', (event) => {
-      if(event.target === instructions){ instructions.close(); }
+    
+    // ****** CORREÇÃO PRINCIPAL DE ÁUDIO ******
+    // Tenta desbloquear o áudio QUANDO o usuário clica no botão "Close"
+    close_button.addEventListener('click', () => { 
+      instructions.close(); 
+      unlockAudio(); // <-- Tenta iniciar o áudio com esta interação
     });
-    instructions.addEventListener('close', () => {
-      if(document.getElementById("game")){
-        // startLoop already called in resetGameState
+    
+    instructions.addEventListener('click', (event) => {
+      if(event.target === instructions){ 
+        instructions.close(); 
+        unlockAudio(); // <-- Tenta iniciar o áudio com esta interação também
       }
     });
   }

@@ -272,3 +272,90 @@ p{
   color: #60ffd1;
   text-decoration: none;
 }
+
+
+/* =================================== */
+/* === EASTER EGG: MODO CLÁSSICO 1984 === */
+/* =================================== */
+
+/* Fundo e texto principal */
+html.classic-1984 {
+  background: #000;
+}
+
+/* Sobrepõe a cor do seu <p> e <header> */
+.classic-1984 p,
+.classic-1984 header,
+.classic-1984 .titlename {
+  color: #00ff00; /* Verde clássico */
+}
+
+/* Cabeçalho */
+.classic-1984 header {
+  background: #000;
+}
+
+/* Painéis do Jogo (Pontos, Jogo, Next) */
+/* Sobrepõe seu tema amarelo/azul */
+.classic-1984 #linescoregeopuzz,
+.classic-1984 #backgroundgeopuzz,
+.classic-1984 #nextgeopuzz {
+  background: #001100; /* Fundo verde bem escuro */
+  color: #00ff00;
+  border-color: #00ff00;
+  border-style: solid; /* Garante que o 'double' seja sobreposto */
+  border-width: 3px;
+}
+
+/* Botões */
+.classic-1984 button,
+.classic-1984 .hud-btn {
+  background: #002200; /* Fundo verde escuro */
+  color: #00ff00;
+  border-color: #00ff00;
+}
+
+/* Links */
+.classic-1984 a {
+  color: #33ff33; /* Verde um pouco mais claro para links */
+}
+
+/* Overlays (Pause, Config, Game Over) */
+.classic-1984 .pause-overlay {
+  background: rgba(0, 20, 0, 0.85);
+}
+
+/* Sobrepõe seus cards de pause e settings */
+.classic-1984 .pause-card {
+  background: #001a00;
+  color: #00ff00;
+  border-color: #00ff00;
+}
+
+.classic-1984 .pause-card a {
+  color: #33ff33;
+}
+
+/* Sobrepõe seus dialogs de instructions e gameover */
+.classic-1984 #instructions,
+.classic-1984 #gameover {
+  background: #001a00;
+  color: #00ff00;
+  border: 3px solid #00ff00;
+}
+
+.classic-1984 #instructions *,
+.classic-1984 #gameover * {
+    color: #00ff00;
+}
+
+.classic-1984 #gameover input {
+    background: #002200;
+    border: 1px solid #00ff00;
+    color: #00ff00;
+}
+
+/* Trocando a cor do recorde e spans */
+.classic-1984 p span {
+    color: #33ff33;
+}
